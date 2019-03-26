@@ -11,10 +11,11 @@ from scipy.spatial import distance as dist
 PLAYERS = ["X","O"]
 
 class GameEngine(object):
-    def __init__(self):
+    def __init__(self, debug=0):
         self.gameboard = ["?"]*9
         self._gameboard = None # temporary variable for opencv board
         self.moves = []
+        self.debug = debug
         self._winning_combinations = (
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -98,7 +99,7 @@ class GameEngine(object):
 
     def _parse_gameboard(self, gameboard_file):
         image = cv2.imread(gameboard_file)
-        self._gameboard = Gameboard.detect_game_board(image, debug=False)
+        self._gameboard = Gameboard.detect_game_board(image, debug=self.debug)
 
     def start(self, gameboard_file="games/default.jpg"):
         self.show_gameboard()
@@ -135,25 +136,28 @@ class Gameposition(object):
         self.endpos = list(br)
         dx = int(round(dist.euclidean(tl, tr),0))
         dy = int(round(dist.euclidean(tl, bl),0))
-        if (self.endpos[0] > self.image.shape[0]):
-            self.endpos[0] = list(self.image.shape)[0]
-        if (self.endpos[1] > self.image.shape[1]):
-            self.endpos[1] = list(self.image.shape)[1]
+        
+        # NOTE: self.image.shape returns [y,x] and not [x,y]
+        if (self.endpos[0] > self.image.shape[1]):
+            self.endpos[0] = list(self.image.shape)[1]
+        if (self.endpos[1] > self.image.shape[0]):
+            self.endpos[1] = list(self.image.shape)[0]
         self.startpos = tuple(self.startpos)
         self.endpos = tuple(self.endpos)
         self.roi = self.image[self.startpos[1]:self.endpos[1], self.startpos[0]:self.endpos[0]]
-        #cv2.imshow("roi: " + self.title, self.roi)
-        #cv2.waitKey(0)
+
         self.roi_in_source = self.source[self.startpos[1]:self.endpos[1], self.startpos[0]:self.endpos[0]]
         self.area = dx*dy
+        #print("{0}, Total area: {1} - TL(x,y) = {2},{3}, BR(x,y) = {4},{5}".format(self.title, self.area, self.startpos[0],self.startpos[1],self.endpos[0],self.endpos[1]))
 
     def draw_rectangle_on_image(self, image=None):
         if (type(image) != np.ndarray):
             image = self.image
         cv2.rectangle(image, self.startpos, self.endpos, (255,0,0), 1)
-        #if self.debug > 1:
-        #    cv2.imshow(self.id, image)
-        #    cv2.waitKey(0)
+        coordinate = (int((self.endpos[0]+self.startpos[0])/2), int((self.endpos[1]+self.startpos[1])/2))
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        black = (0,0,0)
+        cv2.putText(self.source, self.title, coordinate, font, 2, black, 2, cv2.LINE_AA)
 
     def draw_symbol_on_position(self, symbol, position):
         coordinate = tuple(self.rect[0])
@@ -165,20 +169,12 @@ class Gameposition(object):
         return False
     
     def detect_symbol(self, avg_area=None):
-        """ assumes self.image is binary
+        """ Attempts to detect a symbol in self.roi
         based on:
         * https://gurus.pyimagesearch.com/lesson-sample-advanced-contour-properties/
         * http://qtandopencv.blogspot.com/2015/11/analyze-tic-tac-toe-by-computer-vision.html
         """
-        #cv2.imshow(self.title, self.roi)
-        #cv2.waitKey(0)
         imgcopy = self.roi.copy()
-        #cv2.imshow("blabla", imgcopy)
-        #with np.printoptions(threshold=np.inf,linewidth=2000):
-        #    with open("roi.txt", "w") as f:
-        #        f.write(str(imgcopy))
-        #    print("Printed " + self.title)
-        #    input("Trykk en tast...")
         cnts = cv2.findContours(imgcopy, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         lSolidity = []
@@ -186,10 +182,11 @@ class Gameposition(object):
             # compute the area of the contour along with the bounding box
             # to compute the aspect ratio
             area = cv2.contourArea(c)
-            #print("countor area: {0}, detection area: {1}".format(area, self.area))
             # if there are multiple contours detected, check if the detected contour is at
-            # least 10% of total area
-            if (len(cnts) > 1 and i>=0 and area < self.area*0.06 ):
+            # least 6% of total area
+            # also ignore the contour if it is larger than 70% of total area or less than 1% of total area
+            ratio = area/self.area
+            if ((len(cnts) > 1 and i>=0 and (area < self.area*0.06)) or ratio > 0.70 or ratio < 0.01):
                 continue
             (x, y, w, h) = cv2.boundingRect(c)
             # compute the convex hull of the contour, then use the area of the
@@ -198,7 +195,7 @@ class Gameposition(object):
             hull = cv2.convexHull(c)
             hullArea = cv2.contourArea(hull)
             if (hullArea == 0):
-                hullArea = 0.1
+                hullArea = 0.01
             solidity = area / float(hullArea)
             self.solidity = solidity
             lSolidity.append(solidity)
@@ -223,7 +220,7 @@ class Gameposition(object):
         return False
     
     def _detect_if_x(self, solidity):
-        if (solidity > 0.3 and solidity < 0.9):
+        if (solidity > 0.30 and solidity < 0.9):
             return True
         return False
     
@@ -235,20 +232,15 @@ class Gameposition(object):
 
 class Gameboard(object):
     boardtype = "3x3"
-    def __init__(self, img_source, img_binary, intersection_size, intersection_points, debug=False):
+    def __init__(self, img_source, img_binary, intersection_width, intersection_points, debug=False):
         self.source = img_source
         self.binary = img_binary
-        self.intersection_size = intersection_size
+        self.intersection_width = intersection_width
         self.intersection_points = intersection_points
         self.intersection_mask = None
         self.debug = debug
         self.positions = []
-        #cv2.bitwise_not(self.binary, self.binary, self.intersection_mask)
-        # create positions, order = bottom left, bottom right, upper left, upper right
-        #print(self.binary.shape)
-        #np.set_printoptions(edgeitems=3000, linewidth=400000, formatter=dict(float=lambda x: "%.3g" % x))
-        #with open("board.txt", "w") as f:
-        #    f.write(str(self.binary.reshape(self.binary.shape)))
+
         self._calculate_positions()
         self._draw_positions()
         self._detect_symbols()
@@ -324,32 +316,32 @@ class Gameboard(object):
 
         white = (255,255,255)
         black = (0,0,0)
-        cv2.line(mask,l1[0],l1[1],white,int(self.intersection_size*1.1))
-        cv2.line(mask,l2[0],l2[1],white,int(self.intersection_size*1.1))
-        cv2.line(mask,l3[0],l3[1],white,int(self.intersection_size*1.1))
-        cv2.line(mask,l4[0],l4[1],white,int(self.intersection_size*1.1))
+        cv2.line(mask,l1[0],l1[1],white,int(self.intersection_width*1.1))
+        cv2.line(mask,l2[0],l2[1],white,int(self.intersection_width*1.1))
+        cv2.line(mask,l3[0],l3[1],white,int(self.intersection_width*1.1))
+        cv2.line(mask,l4[0],l4[1],white,int(self.intersection_width*1.1))
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         cv2.bitwise_not(self.binary, self.binary, mask)
 
     def _calculate_positions(self):
         middle = self._order_points(self.intersection_points)
         mask = self._create_mask(middle)
-        #middle = np.floor_divide(middle, 10/9).astype(int)
-        dx = int(round(dist.euclidean(middle[0], middle[1]),0))
-        dy = int(round(dist.euclidean(middle[0], middle[2]),0))
         
-        offset_x_y = np.array([dx,dy])
-        offset_nx_y = np.array([-dx,dy])
-        offset_x_ny = np.array([dx,-dy])
-        offset_x = np.array([dx,0])
-        offset_y = np.array([0,dy])
+        dx = abs(int(round(dist.euclidean(middle[0], middle[1]),0)))
+        dy = abs(int(round(dist.euclidean(middle[0], middle[2]),0)))
+        w = 0 #int(self.intersection_width/2)
+        
+        offset_x_y = np.array([dx+w,dy+w])
+        offset_nx_y = np.array([-dx-w,dy+w])
+        offset_x_ny = np.array([dx+w,-dy-w])
+        offset_x = np.array([dx+w,0])
+        offset_y = np.array([0,dy+w])
 
         
-
         topleft = np.subtract(middle,offset_x_y)
         topright = np.add(middle, offset_x_ny)
-        midtop = np.subtract(middle, offset_y)
-        midbottom = np.add(middle, offset_y)
+        topmid = np.subtract(middle, offset_y)
+        bottommid = np.add(middle, offset_y)
         bottomright = np.add(middle,offset_x_y)
         bottomleft = np.subtract(middle, offset_x_ny)
         leftmost = np.subtract(middle, offset_x)
@@ -357,13 +349,13 @@ class Gameboard(object):
 
         self.positions = [
                     Gameposition(self.source, self.binary, "tl", topleft, self.debug),
-                    Gameposition(self.source, self.binary, "mt", midtop, self.debug),
+                    Gameposition(self.source, self.binary, "tm", topmid, self.debug),
                     Gameposition(self.source, self.binary, "tr", topright, self.debug),
                     Gameposition(self.source, self.binary, "ll", leftmost, self.debug),
                     Gameposition(self.source, self.binary, "mm", middle, self.debug),
                     Gameposition(self.source, self.binary, "rr", rightmost, self.debug),
                     Gameposition(self.source, self.binary, "bl", bottomleft, self.debug),
-                    Gameposition(self.source, self.binary, "mb", midbottom, self.debug),
+                    Gameposition(self.source, self.binary, "bm", bottommid, self.debug),
                     Gameposition(self.source, self.binary, "br", bottomright, self.debug),
         ]
 
@@ -436,12 +428,10 @@ class Gameboard(object):
             if len(approx) in (4,):
                 # get the bounding rect
                 x, y, w, h = cv2.boundingRect(cnt)
-                #print(x,y,w,x)
                 cv2.rectangle(source, (x,y), (x+w,y+h), (255,0,0), 1)
                 if debug>1:                   
                     cv2.imshow("rectangle", source)
                     cv2.waitKey(0)
-                # find center
                 center = Gameboard._get_center_position_of_rectangle(x, x+w, y, y+h)
                 positions.append(center)
             else:

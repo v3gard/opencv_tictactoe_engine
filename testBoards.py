@@ -8,8 +8,12 @@ def print_header():
     print("-"*len(title))
 
 def main():
-    tests = {"Empty board": {
+    tests = {"Empty board (handdrawn)": {
                 "path":"tests/empty_board.jpg",
+                "x_count": 0,
+                "o_count": 0},
+             "Empty board (computer drawn)": {
+                "path":"tests/empty_board_2.jpg",
                 "x_count": 0,
                 "o_count": 0},
              "One average x":{

@@ -1,3 +1,6 @@
 *.pyc
 *.pyd
 *.un~
+Lib/*
+Scripts/*
+pyvenv.cfg
