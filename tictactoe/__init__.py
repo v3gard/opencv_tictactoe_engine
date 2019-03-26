@@ -5,17 +5,19 @@ import imutils
 import sys
 import pdb
 import random
+from datetime import datetime
 
 from scipy.spatial import distance as dist
 
 PLAYERS = ["X","O"]
 
 class GameEngine(object):
-    def __init__(self, debug=0):
+    def __init__(self, use_keyboard=True, debug=0):
         self.gameboard = ["?"]*9
         self._gameboard = None # temporary variable for opencv board
         self.moves = []
         self.debug = debug
+        self._use_keyboard=use_keyboard
         self._winning_combinations = (
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -24,7 +26,8 @@ class GameEngine(object):
         self.currentplayer = self._decide_initial_player()
     
     def _is_board_empty(self):
-        unique = set(self.gameboard)
+        unique = list(set(self._gameboard.status()))
+        print(unique)
         if (len(unique) == 1) and unique[0] == "?":
             return True
         return False
@@ -72,13 +75,21 @@ class GameEngine(object):
 
     def _ask_player_move(self):
         valid = False
+        before = str(self._gameboard.status())
         while (not valid):
-            pos = input("Enter position [0-8]: ")
-            valid_pos = self._is_move_valid(pos)
-            if (valid_pos != None):
-                valid=True
-                self._update_board(valid_pos, self.player)
-                self.currentplayer = self.enemy
+            if self._use_keyboard==False:
+                wait = input("Place token on board. Then press [enter]")
+                self._parse_gameboard(use_camera=True, gameboard_file="")
+                status = str(self._gameboard.status())
+                print("before: " + before)
+                print("now: " + status)
+            else:
+                pos = input("Enter position [0-8]: ")
+                valid_pos = self._is_move_valid(pos)
+                if (valid_pos != None):
+                    valid=True
+                    self._update_board(valid_pos, self.player)
+                    self.currentplayer = self.enemy
 
     def _make_move(self):
         if self.currentplayer == self.player:
@@ -97,14 +108,26 @@ class GameEngine(object):
         print("{0} {1} {2}".format(t[3], t[4], t[5]))
         print("{0} {1} {2}".format(t[6], t[7], t[8]))
 
-    def _parse_gameboard(self, gameboard_file):
-        image = cv2.imread(gameboard_file)
+    def _parse_gameboard(self, use_camera, gameboard_file):
+        if use_camera==False:
+            image = cv2.imread(gameboard_file)
+        else:
+            cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            ret_val, image = cam.read()
+            cv2.imwrite(datetime.now().strftime("%H%M%S.jpg"), image)
+            cam.release()
+            cv2.destroyAllWindows()
+        #if self._gameboard != None:
+        #    self._gameboard = Gameboard.update_gameboard(self._gameboard)
         self._gameboard = Gameboard.detect_game_board(image, debug=self.debug)
 
-    def start(self, gameboard_file="games/default.jpg"):
-        self.show_gameboard()
+    def start(self, use_camera=False, gameboard_file="games/default.jpg"):
+        #self.show_gameboard()
+        self._parse_gameboard(use_camera, gameboard_file)
+        self._is_board_empty()
+        #    raise Exception("Board is not empty. Please clear board.")
         while (not self._is_game_won()):
-            self._parse_gameboard(gameboard_file)
+            self._parse_gameboard(use_camera, gameboard_file)
             print("your move player {0}".format(self.currentplayer))
             self._make_move()
             self.show_gameboard()
@@ -118,20 +141,20 @@ class GameEngine(object):
             print("GAME OVER! YOU LOST!")
 
 class Gameposition(object):
-    def __init__(self, src_image, bin_image, title, rect, debug=False):
+    def __init__(self, src_image, bin_image, title, positions, debug=False):
         self.source = src_image
         self.image = bin_image
         self.id = str(id(self))
         self.title = title
         self.symbol = "?"
         self.area = None
-        self.rect = rect
+        self.positions = positions
         self.solidity = None
         self.debug = debug
-        self._process_subimage(rect)
+        self._process_subimage(positions)
 
-    def _process_subimage(self, rect):      
-        (tl, tr, bl, br) = tuple(rect)
+    def _process_subimage(self, positions):      
+        (tl, tr, bl, br) = tuple(positions)
         self.startpos = list(tl)
         self.endpos = list(br)
         dx = int(round(dist.euclidean(tl, tr),0))
@@ -160,7 +183,7 @@ class Gameposition(object):
         cv2.putText(self.source, self.title, coordinate, font, 2, black, 2, cv2.LINE_AA)
 
     def draw_symbol_on_position(self, symbol, position):
-        coordinate = tuple(self.rect[0])
+        coordinate = tuple(self.positions[0])
         font = cv2.FONT_HERSHEY_SIMPLEX
         black = (0,0,0)
         cv2.putText(self.source, symbol, coordinate, font, 4, black, 2, cv2.LINE_AA)
@@ -184,9 +207,9 @@ class Gameposition(object):
             area = cv2.contourArea(c)
             # if there are multiple contours detected, check if the detected contour is at
             # least 6% of total area
-            # also ignore the contour if it is larger than 70% of total area or less than 1% of total area
+            # also ignore the contour if it is larger than 70% of total area or less than 6% of total area
             ratio = area/self.area
-            if ((len(cnts) > 1 and i>=0 and (area < self.area*0.06)) or ratio > 0.70 or ratio < 0.01):
+            if ((len(cnts) > 1 and i>=0 and (area < self.area*0.06)) or ratio > 0.70 or ratio < 0.06):
                 continue
             (x, y, w, h) = cv2.boundingRect(c)
             # compute the convex hull of the contour, then use the area of the
@@ -208,7 +231,7 @@ class Gameposition(object):
                 self.symbol = "X"
             if found:
                 if self.debug>0:
-                    print("{0}: Contours: {1}, Solidity: {2}".format(self.title, len(cnts), solidity))
+                    print("{0}: Contours: {1}, Solidity: {2}, Ratio: {3}, Detected: {4}".format(self.title, len(cnts), solidity, ratio, self.symbol))
                     img = self.roi_in_source.copy()
                     cv2.drawContours(img,[c],0,(0,255,0),-1)
                     cv2.imshow(self.title, img)
@@ -232,17 +255,22 @@ class Gameposition(object):
 
 class Gameboard(object):
     boardtype = "3x3"
-    def __init__(self, img_source, img_binary, intersection_width, intersection_points, debug=False):
+    def __init__(self, img_source, img_binary, intersection_width, intersection_points, gameboard=None, debug=False):
         self.source = img_source
         self.binary = img_binary
         self.intersection_width = intersection_width
         self.intersection_points = intersection_points
         self.intersection_mask = None
         self.debug = debug
-        self.positions = []
-
-        self._calculate_positions()
-        self._draw_positions()
+        
+        if not isinstance(gameboard, Gameboard):
+            self.positions = []
+            self._calculate_positions()
+            self._draw_positions()
+        else:
+            self.positions = gameboard.positions
+            self.intersection_mask = gameboard.intersection_mask
+            self.intersection_points = gameboard.intersection_points
         self._detect_symbols()
 
     def __repr__(self):
@@ -288,9 +316,14 @@ class Gameboard(object):
     def _slope(self, a, b):
         return float((b[1]-a[1])/(b[0]-a[0]))
 
-    def _create_line(self, p1, p2):
+    def _create_line(self, p1, p2, vertical=True):
         p = [0,0]
         q = list(self.source.shape[0:2])
+        if not vertical:
+            tmp = q[0]
+            q[0] = q[1]
+            q[1] = tmp
+            
         if (p1[0] != p2[0]):
             m = self._slope(p1,p2)
             # y = m * x + b
@@ -309,8 +342,8 @@ class Gameboard(object):
         pts = ordered_intersection_points
         l1 = self._create_line(list(pts[0]), list(pts[2]))
         l2 = self._create_line(list(pts[1]), list(pts[3]))
-        l3 = self._create_line(list(pts[0]), list(pts[1]))
-        l4 = self._create_line(list(pts[2]), list(pts[3]))
+        l3 = self._create_line(list(pts[0]), list(pts[1]), vertical=False)
+        l4 = self._create_line(list(pts[2]), list(pts[3]), vertical=False)
 
         mask = np.zeros(self.source.shape, self.source.dtype)
 
@@ -321,6 +354,9 @@ class Gameboard(object):
         cv2.line(mask,l3[0],l3[1],white,int(self.intersection_width*1.1))
         cv2.line(mask,l4[0],l4[1],white,int(self.intersection_width*1.1))
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        if self.debug > 2:
+            cv2.imshow("mask", mask)
+            cv2.waitKey(0)
         cv2.bitwise_not(self.binary, self.binary, mask)
 
     def _calculate_positions(self):
@@ -380,6 +416,14 @@ class Gameboard(object):
         return binary
 
     @staticmethod
+    def update_gameboard(gameboard):
+        source = gameboard.source
+        binary = gameboard.binary
+        w = gameboard.intersection_width
+        positions = gameboard.positions
+        return Gameboard(source, binary, w, positions, gameboard=gameboard)
+        
+    @staticmethod
     def detect_game_board(source, debug=False):
         image = Gameboard._preprocess_image_to_binary(source, debug)
         # Defining a kernel length
@@ -425,7 +469,7 @@ class Gameboard(object):
             if debug>3:
                 cv2.imshow("Showing game board intersection {0}".format(i+1),source)
                 cv2.waitKey(0)
-            if len(approx) in (4,):
+            if len(approx) ==4:
                 # get the bounding rect
                 x, y, w, h = cv2.boundingRect(cnt)
                 cv2.rectangle(source, (x,y), (x+w,y+h), (255,0,0), 1)
