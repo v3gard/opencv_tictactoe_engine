@@ -4,8 +4,8 @@ from tictactoe import *
 
 def main():
     try:
-        ge = GameEngine(use_keyboard=True, debug=1)
-        ge.start(use_camera=False)
+        ge = GameEngine(use_keyboard=False, debug=0)
+        ge.start(use_camera=True, gameboard_file="tests/234505.jpg")
     except KeyboardInterrupt as e:
         print("\nBye! Thanks for playing!")
     #except Exception as e:

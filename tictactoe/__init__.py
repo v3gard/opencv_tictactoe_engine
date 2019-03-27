@@ -123,8 +123,8 @@ class GameEngine(object):
 
     def start(self, use_camera=False, gameboard_file="games/default.jpg"):
         #self.show_gameboard()
-        self._parse_gameboard(use_camera, gameboard_file)
-        self._is_board_empty()
+        #self._parse_gameboard(use_camera, gameboard_file)
+        #self._is_board_empty()
         #    raise Exception("Board is not empty. Please clear board.")
         while (not self._is_game_won()):
             self._parse_gameboard(use_camera, gameboard_file)
@@ -201,6 +201,8 @@ class Gameposition(object):
         cnts = cv2.findContours(imgcopy, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         lSolidity = []
+        #if self.title == "mm":
+        #    pdb.set_trace()
         for (i, c) in enumerate(cnts):
             # compute the area of the contour along with the bounding box
             # to compute the aspect ratio
@@ -209,7 +211,7 @@ class Gameposition(object):
             # least 6% of total area
             # also ignore the contour if it is larger than 70% of total area or less than 6% of total area
             ratio = area/self.area
-            if ((len(cnts) > 1 and i>=0 and (area < self.area*0.06)) or ratio > 0.70 or ratio < 0.06):
+            if ((len(cnts) > 1 and i>=0 and (area < self.area*0.01)) or ratio > 0.70 or ratio < 0.06):
                 continue
             (x, y, w, h) = cv2.boundingRect(c)
             # compute the convex hull of the contour, then use the area of the
@@ -229,6 +231,7 @@ class Gameposition(object):
             elif (self._detect_if_x(solidity)):
                 found = True
                 self.symbol = "X"
+            
             if found:
                 if self.debug>0:
                     print("{0}: Contours: {1}, Solidity: {2}, Ratio: {3}, Detected: {4}".format(self.title, len(cnts), solidity, ratio, self.symbol))
@@ -263,14 +266,12 @@ class Gameboard(object):
         self.intersection_mask = None
         self.debug = debug
         
-        if not isinstance(gameboard, Gameboard):
-            self.positions = []
-            self._calculate_positions()
-            self._draw_positions()
-        else:
-            self.positions = gameboard.positions
-            self.intersection_mask = gameboard.intersection_mask
-            self.intersection_points = gameboard.intersection_points
+        self.positions = []
+        self._calculate_positions()
+        #self.intersection_mask = gameboard.intersection_mask
+        #self.intersection_points = gameboard.intersection_points
+        
+        self._draw_positions()
         self._detect_symbols()
 
     def __repr__(self):
@@ -354,10 +355,13 @@ class Gameboard(object):
         cv2.line(mask,l3[0],l3[1],white,int(self.intersection_width*1.1))
         cv2.line(mask,l4[0],l4[1],white,int(self.intersection_width*1.1))
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        #invert mask
+        mask = cv2.bitwise_not(mask)
+        
         if self.debug > 2:
             cv2.imshow("mask", mask)
             cv2.waitKey(0)
-        cv2.bitwise_not(self.binary, self.binary, mask)
+        self.binary = cv2.bitwise_and(self.binary, mask)
 
     def _calculate_positions(self):
         middle = self._order_points(self.intersection_points)
@@ -482,4 +486,4 @@ class Gameboard(object):
                 raise Exception("Unable to detect game board intersections. Try to adjust the weight.")
         if (len(positions) != 4):
             raise Exception("Unable to detect 3x3 game board")
-        return Gameboard(source, image, w, positions, debug)
+        return Gameboard(source, image, w, positions, debug=debug)
