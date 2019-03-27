@@ -44,6 +44,14 @@ def main():
                 "path":"tests/cam_4O.jpg",
                 "x_count": 0,
                 "o_count": 4},
+             "Camera, O=4, X=1": {
+                "path":"tests/cam_4O_1X.jpg",
+                "x_count": 1,
+                "o_count": 4},
+             "Camera, O=4, X=2": {
+                "path":"tests/cam_4O_2X.jpg",
+                "x_count": 2,
+                "o_count": 4},
              "One average x":{
                 "path":"tests/one_average_x.jpg",
                 "x_count": 1,
