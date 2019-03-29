@@ -6,14 +6,17 @@ import sys
 import pdb
 import random
 from datetime import datetime
+from time import sleep
 
 from scipy.spatial import distance as dist
 
 PLAYERS = ["X","O"]
 
 class GameEngine(object):
-    def __init__(self, use_keyboard=True, debug=0):
+    def __init__(self, dobot_manager=None, use_keyboard=True, debug=0):
+        self._dm = dobot_manager
         self.gameboard = ["?"]*9
+        self.currentbuffer = 0
         self._gameboard = None # temporary variable for opencv board
         self.moves = []
         self.debug = debug
@@ -24,10 +27,12 @@ class GameEngine(object):
         [0, 4, 8], [2, 4, 6])
         self.player, self.enemy = self._ask_player_letter()
         self.currentplayer = self._decide_initial_player()
+
+        if self._dm != None:
+            self._dm.camera.move_nooffset(self._dm, wait=1)
     
     def _is_board_empty(self):
         unique = list(set(self._gameboard.status()))
-        print(unique)
         if (len(unique) == 1) and unique[0] == "?":
             return True
         return False
@@ -75,14 +80,31 @@ class GameEngine(object):
 
     def _ask_player_move(self):
         valid = False
-        before = str(self._gameboard.status())
+        before = self.gameboard
         while (not valid):
             if self._use_keyboard==False:
                 wait = input("Place token on board. Then press [enter]")
-                self._parse_gameboard(use_camera=True, gameboard_file="")
-                status = str(self._gameboard.status())
-                print("before: " + before)
-                print("now: " + status)
+                try:
+                    self._parse_gameboard(use_camera=True, gameboard_file="")
+                    status = self._gameboard.status()
+                except Exception as e:
+                    print("ERROR: Unable to parse gameboard. Exception was: " + str(e))
+                    status = before
+                poslist = [i for i,v in enumerate(zip(before,status)) if v[0] not in PLAYERS and v[0] != v[1]]
+                pos=-1
+                if len(poslist)==0:
+                    print("No new token detected. Please adjust the position.")
+                    continue
+                elif len(poslist)>1:
+                    print("No cheating!")
+                    pdb.set_trace()
+                    continue
+                pos = poslist[0]
+                valid_pos = self._is_move_valid(pos)
+                if (valid_pos != None):
+                    valid = True
+                    self._update_board(valid_pos, self.player)
+                    self.currentplayer = self.enemy
             else:
                 pos = input("Enter position [0-8]: ")
                 valid_pos = self._is_move_valid(pos)
@@ -99,11 +121,19 @@ class GameEngine(object):
 
     def _ai_make_move(self):
         pos = self._get_free_position()
+        if self._dm != None:
+            self._dm.buffer[self.currentbuffer].pick(self._dm)
+            self._dm.slot[pos].place(self._dm)
+            self._dm.camera.move_nooffset(self._dm, wait=0)
+            self.currentbuffer += 1
         self._update_board(pos, self.enemy)
         self.currentplayer = self.player
 
-    def show_gameboard(self):
-        t = self.gameboard
+    def show_gameboard(self, gameboard=None):
+        if gameboard==None:
+            t = self.gameboard
+        else:
+            t = gameboard
         print("{0} {1} {2}".format(t[0], t[1], t[2]))
         print("{0} {1} {2}".format(t[3], t[4], t[5]))
         print("{0} {1} {2}".format(t[6], t[7], t[8]))
@@ -114,7 +144,7 @@ class GameEngine(object):
         else:
             cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
             ret_val, image = cam.read()
-            cv2.imwrite(datetime.now().strftime("%H%M%S.jpg"), image)
+            #cv2.imwrite(datetime.now().strftime("%H%M%S.jpg"), image)
             cam.release()
             cv2.destroyAllWindows()
         #if self._gameboard != None:
@@ -123,12 +153,17 @@ class GameEngine(object):
 
     def start(self, use_camera=False, gameboard_file="games/default.jpg"):
         #self.show_gameboard()
-        #self._parse_gameboard(use_camera, gameboard_file)
-        #self._is_board_empty()
-        #    raise Exception("Board is not empty. Please clear board.")
+        self._parse_gameboard(use_camera, gameboard_file)
+        if not self._is_board_empty():
+            raise Exception("Board is not empty. Please clear board.")
         while (not self._is_game_won()):
-            self._parse_gameboard(use_camera, gameboard_file)
-            print("your move player {0}".format(self.currentplayer))
+            try:
+                self._parse_gameboard(use_camera, gameboard_file)
+            except Exception as e:
+                print("Unable to detect game board.")
+                sleep(1)
+                continue
+            print("Your move player {0}".format(self.currentplayer))
             self._make_move()
             self.show_gameboard()
         winner = self._is_game_won()
@@ -282,7 +317,7 @@ class Gameboard(object):
         pass
 
     def status(self):
-        return np.array([pos.symbol for pos in self.positions], dtype=str)
+        return [pos.symbol for pos in self.positions]
 
     def _detect_symbols(self):
         for position in self.positions:
