@@ -16,5 +16,8 @@ Future work
 -----------
 
 1. Improve detection
-2. Fully integrate with opencv and camera
-3. Test with Dobot robot
+2. ~Fully integrate with opencv and camera~
+3. ~Test with Dobot robot~
+4. Implement minimax AI algorithm
+5. Dobot mode only supports the player being X at the moment. Increase support for O.
+6. Make Dobot return pieces afterwards.
