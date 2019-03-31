@@ -13,14 +13,13 @@ from scipy.spatial import distance as dist
 PLAYERS = ["X","O"]
 
 class GameEngine(object):
-    def __init__(self, dobot_manager=None, use_keyboard=True, debug=0):
+    def __init__(self, dobot_manager=None, debug=0):
         self._dm = dobot_manager
         self.gameboard = ["?"]*9
         self.currentbuffer = 0
         self._gameboard = None # temporary variable for opencv board
         self.moves = []
         self.debug = debug
-        self._use_keyboard=use_keyboard
         self._winning_combinations = (
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -82,7 +81,7 @@ class GameEngine(object):
         valid = False
         before = self.gameboard
         while (not valid):
-            if self._use_keyboard==False:
+            if self._dm != None:
                 wait = input("Place token on board. Then press [enter]")
                 try:
                     self._parse_gameboard(use_camera=True, gameboard_file="")
@@ -172,8 +171,18 @@ class GameEngine(object):
             print("GAME OVER! IT WAS A TIE!")
         elif (winner == self.player):
             print("YOU WON!")
+            if self._dm != None:
+                self._dm.set_speed(velocity=20)
+                self._dm.pose.move_nooffset(self._dm, wait=0.5)
+                self._dm.set_speed()
         else:
             print("GAME OVER! YOU LOST!")
+            if self._dm != None:
+                self._dm.set_speed(velocity=100)
+                for i in range(3):
+                    self._dm.pose.movej_nooffset(self._dm, wait=0)
+                    self._dm.camera.movej_nooffset(self._dm, wait=0)
+            
 
 class Gameposition(object):
     def __init__(self, src_image, bin_image, title, positions, debug=False):
@@ -273,6 +282,7 @@ class Gameposition(object):
                     img = self.roi_in_source.copy()
                     cv2.drawContours(img,[c],0,(0,255,0),-1)
                     cv2.imshow(self.title, img)
+                if self.debug>1:
                     cv2.waitKey(0)
                 break
         if (self.symbol in ("O","X")):
@@ -308,6 +318,8 @@ class Gameboard(object):
         
         self._draw_positions()
         self._detect_symbols()
+        if debug > 0:
+            cv2.waitKey(0)
 
     def __repr__(self):
         jeje = str(self.status())
@@ -328,6 +340,7 @@ class Gameboard(object):
             position.draw_rectangle_on_image(self.source)
         if self.debug>0:
             cv2.imshow("Game positions", self.source)
+        if self.debug>1:
             cv2.waitKey(0)
 
     def _order_points(self, unordered_points):

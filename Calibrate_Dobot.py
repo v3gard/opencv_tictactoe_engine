@@ -73,26 +73,38 @@ def calibrate(exists=False):
     cont = input("3. Press [enter] to continue.")
     p = dType.GetPose(api)
     camera = DobotPosition(p[0], p[1], p[2], p[3])
+
+    print("POSE POSITION\n---------------")
+    print("1. Enable the camera on your PC.")
+    print("2. Given the previous camera position, move the arm to a new position that will")
+    print("   be used for 'posing' whenever the robot wins or looses.")
+    cont = input("3. Press [enter] to continue.")
+    p = dType.GetPose(api)
+    pose = DobotPosition(p[0], p[1], p[2], p[3])
+
     
     positions = {}
     positions["slots"] = {key:slot[key].__dict__ for key in slot.keys()}
     positions["buffer"] = {key:buffer[key].__dict__ for key in buffer.keys()}
     positions["camera"] = camera.__dict__
+    positions["pose"] = pose.__dict__
     
     with open("calibration.data", "w") as f:
         f.write(json.dumps(positions))
     
     print("Dobot calibrated for Tic Tac Toe!")
-    return (camera,buffer,slot)
+    return (camera,buffer,slot, pose)
 
 def test(dobot_manager, camera, buffer, slot):
     dm = dobot_manager
+    dm.set_speed()
     print("Going to camera position...")
     camera.move_nooffset(dm)
     print("Testing all board positions...")
     for i in sorted(slot.keys()):
         print("Going to position {0}...".format(i+1))
-        slot[i].move(dm)
+        slot[i].move(dm, jumpspeed=50)
+        dm.set_speed(velocity=100)
     print("Done")
     print("Testing all buffer positions...")
     for i in sorted(buffer.keys()):
@@ -133,7 +145,7 @@ def main():
             exists = True
     except Exception:
         pass
-    camera,buffer,slot = DobotPosition.deserialize(jsondata)
+    camera,buffer,slot,pose = DobotPosition.deserialize(jsondata)
 
     print("\n---------------------------------------------")
     print("OpenCV Tic Tac Toe Engine - Dobot Calibration")
@@ -151,7 +163,7 @@ def main():
         print ("X. Exit")
         choice = input("Select task: ")
         if choice == "1":
-            camera,buffer,slot = calibrate(exists)
+            camera,buffer,slot,pose = calibrate(exists)
         elif choice == "2":
             show_position()
         elif choice == "3":
