@@ -1,3 +1,11 @@
 *.pyc
 *.pyd
 *.un~
+Lib/*
+Scripts/*
+pyvenv.cfg
+calibration.data
+tcl
+pip*
+Include
+*workspace
