@@ -6,6 +6,8 @@ import sys
 import pdb
 import random
 
+from random import randint
+
 from scipy.spatial import distance as dist
 
 PLAYERS = ["X","O"]
@@ -37,10 +39,21 @@ class GameEngine(object):
             return "tie"
         return None
 
+    def _is_game_won_player(self, player, board):
+        for combos in self._winning_combinations:
+            if (board[combos[0]] == player and board[combos[1]] == player and board[combos[2]] == player):
+                return True
+
+        return False
+
     def _get_free_position(self):
         board = self.gameboard
         free = [i for i,pos in enumerate(board) if pos=="?"]
         return random.choice(free)
+
+    def _get_all_free_pos(self, board):
+        free = [i for i, pos in enumerate(board) if pos == "?"]
+        return free
 
     def _decide_initial_player(self):
         return random.choice(PLAYERS)
@@ -69,6 +82,10 @@ class GameEngine(object):
         self.gameboard[pos] = player
         self._gameboard.positions[pos].draw_symbol_on_position(player, pos)
 
+    def update_ai_board(self,pos,player, board):
+        board[pos] = player
+        return board
+
     def _ask_player_move(self):
         valid = False
         while (not valid):
@@ -85,6 +102,109 @@ class GameEngine(object):
         else:
             self._ai_make_move()
 
+    def init_gameboard_ai(self):
+        #board = ["X", "?", "?", "O", "?", "O", "?", "X", "?"]
+        board = 9*["?"]
+        self.gameboard = board
+        return board
+
+    def _change_player(self,player):
+        if player == "X":
+            return "O"
+        else:
+            return "X"
+
+    def minimax(self, newBoard, player):
+        available_pos = self._get_all_free_pos(newBoard)
+
+
+
+        if self._is_game_won_player("X", newBoard):
+            score = 0
+            return score
+        elif self._is_game_won_player("O", newBoard):
+            score = 100
+            return score
+        elif len(available_pos) == 0:
+            score = 50
+            return score
+
+        if player == "O":
+            bestVal = 0
+            for var in available_pos:
+                # print("Making move: " + str(var))
+                newBoard = self.update_ai_board(var, player, newBoard)
+                moveVal = self.minimax(newBoard, "X")
+                newBoard = self.update_ai_board(var, "?", newBoard)
+                bestVal = max(bestVal, moveVal)
+            return bestVal
+
+
+        if player == "X":
+            bestVal = 100
+            for var in available_pos:
+                # print("Making move: " + str(var))
+                newBoard = self.update_ai_board(var, player, newBoard)
+                moveVal = self.minimax(newBoard, "O")
+                newBoard = self.update_ai_board(var, "?", newBoard)
+                bestVal = min(bestVal, moveVal)
+            return bestVal
+
+
+
+    def make_best_move(self, board, player,difficulty):
+
+        if difficulty == "Easy":
+            diff_random = 25
+        elif difficulty == "Medium":
+            diff_random = 50
+        elif difficulty == "Hard":
+            diff_random = 75
+        else:
+            diff_random = 100
+        # Generate random
+        rnum = randint(0, 100)
+        # Find available moves
+        initValue = 50
+        best_choices = []
+
+        available_pos = self._get_all_free_pos(board)
+        if rnum > diff_random:
+            move = random.choice(available_pos)
+            return move
+
+        else:
+            if player == "O":
+
+                for move in available_pos:
+                    board = self.update_ai_board(move, player, board)
+                    moveVal = self.minimax(board, self._change_player(player))
+                    board = self.update_ai_board(move, "?", board)
+
+                    if moveVal > initValue:
+                        best_choices = [move]
+                        return move
+                    elif moveVal == initValue:
+                        best_choices.append(move)
+            else:
+                for move in available_pos:
+                    board = self.update_ai_board(move, player, board)
+                    moveVal = self.minimax(board, self._change_player(player))
+                    board = self.update_ai_board(move, "?", board)
+
+                    if moveVal < initValue:
+                        best_choices = [move]
+                        return move
+                    elif moveVal == initValue:
+                        best_choices.append(move)
+
+            if len(best_choices)>0:
+                return random.choice(best_choices)
+            else:
+                return random.choice(available_pos)
+
+
+
     def _ai_make_move(self):
         pos = self._get_free_position()
         self._update_board(pos, self.enemy)
@@ -96,19 +216,60 @@ class GameEngine(object):
         print("{0} {1} {2}".format(t[3], t[4], t[5]))
         print("{0} {1} {2}".format(t[6], t[7], t[8]))
 
+    def show_board(self,board):
+        t = board
+        print("{0} {1} {2}".format(t[0], t[1], t[2]))
+        print("{0} {1} {2}".format(t[3], t[4], t[5]))
+        print("{0} {1} {2}".format(t[6], t[7], t[8]))
+
     def _parse_gameboard(self, gameboard_file):
         image = cv2.imread(gameboard_file)
         self._gameboard = Gameboard.detect_game_board(image, debug=False)
 
     def start(self, gameboard_file="games/default.jpg"):
-        self.show_gameboard()
+        #self.show_gameboard()
+
+        origBoard = self.init_gameboard_ai()
+
+        # Print board status
+        print("Current board: \n \n")
+        self.show_board(origBoard)
+        ai_player = self.enemy
+        hu_player = self.player
+
+        difficulty = int(input(" 1: Easy \n 2: Medium \n 3: Hard \n 4: Expert \n Choose a difficulty: "))
+        if difficulty == 1:
+            diff = "Easy"
+        elif difficulty == 2:
+            diff = "Medium"
+        elif difficulty == 3:
+            diff = "Hard"
+        else:
+            diff = "Expert"
         while (not self._is_game_won()):
-            self._parse_gameboard(gameboard_file)
-            print("your move player {0}".format(self.currentplayer))
-            self._make_move()
-            self.show_gameboard()
+            move = int(input("Your turn. Choose a number from 0-8:"))
+
+
+            while origBoard[move] != "?":
+                    print("Invalid move! Retry")
+                    move = int(input("Your turn. Choose a number from 0-8:"))
+
+            origBoard = self.update_ai_board(move, self.player, origBoard)
+            print("Current board: \n \n")
+            self.show_board(origBoard)
+
+            if self._is_game_won():
+                break
+
+            # Computer move
+            ai_move = self.make_best_move(origBoard,self.enemy,diff)
+            print("Supercomputer move: " + str(ai_move))
+            origBoard = self.update_ai_board(ai_move,self.enemy,origBoard)
+
+            print("Current board: \n \n")
+            self.show_board(origBoard)
+
         winner = self._is_game_won()
-        self.show_gameboard()
         if (winner == "tie"):
             print("GAME OVER! IT WAS A TIE!")
         elif (winner == self.player):
