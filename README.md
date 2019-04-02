@@ -2,8 +2,8 @@ OpenCV Tic Tac Toe Engine
 =========================
 
 Authors:
-Vegard Haugland <vegard@haugland.at>
-Vegard Tveit <vegardtve@gmail.com>
+* Vegard Haugland <vegard@haugland.at>
+* Vegard Tveit <vegardtve@gmail.com>
 
 How to use
 ----------
