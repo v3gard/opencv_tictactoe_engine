@@ -1,7 +1,9 @@
 OpenCV Tic Tac Toe Engine
 =========================
 
-Authors: Vegard Haugland <vegard@haugland.at>, Vegard Tveit <vegardtve@gmail.com>
+Authors:
+Vegard Haugland <vegard@haugland.at>
+Vegard Tveit <vegardtve@gmail.com>
 
 How to use
 ----------
@@ -18,6 +20,6 @@ Future work
 1. Improve detection
 2. ~Fully integrate with opencv and camera~
 3. ~Test with Dobot robot~
-4. ~Implement minimax AI algorithm~ Thanks to vegardtve
+4. ~Implement minimax AI algorithm~ Thanks to Vegard Tveit
 5. Dobot mode only supports the player being X at the moment. Increase support for O.
 6. Make Dobot return pieces afterwards.
