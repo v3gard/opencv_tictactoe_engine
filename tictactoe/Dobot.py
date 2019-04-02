@@ -10,8 +10,9 @@ class DobotPosition(object):
     def __repr__(self):
         return "X={0}, Y={1}, Z={2}, R={3}".format(self.x, self.y, self.z, self.r)
 
-    def move(self, dobot_manager, zoffset=12, jumpspeed=100, wait=1):
+    def move(self, dobot_manager, zoffset=10, jumpspeed=50, wait=1):
         dm = dobot_manager
+        dm.set_speed(velocity=50)
         dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, 0, self.r, 1)
         dm.set_speed(velocity=jumpspeed)
         dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, self.z+zoffset, self.r, 1)
@@ -25,21 +26,26 @@ class DobotPosition(object):
 
     def movej_nooffset(self, dobot_manager, wait=5):
         dm = dobot_manager
+        dm.set_speed(velocity=50)
         dm.dType.SetPTPCmdEx(dm.api, 1, self.x,  self.y, self.z, self.r, 1)
         dm.dType.SetWAITCmdEx(dm.api, wait, 1)
 
-    def pick(self, dobot_manager, zoffset=10, wait=0.5):
+    def pick(self, dobot_manager, zoffset=10, wait=1.0):
         dm = dobot_manager
-        dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, 0, self.r, 1)
+        dm.set_speed(velocity=50)
+        dm.dType.SetPTPCmdEx(dm.api, 1, self.x,  self.y, 0, self.r, 1)
         dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, self.z+zoffset, self.r, 1)
         dm.dType.SetWAITCmdEx(dm.api, wait, 1)
         dm.dType.SetEndEffectorSuctionCupEx(dm.api, 1, 1)
+        dm.set_speed(velocity=20)
         dm.dType.SetWAITCmdEx(dm.api, wait, 1)
-        dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, 0, self.r, 1)
+        dm.dType.SetPTPCmdEx(dm.api, 1, self.x,  self.y, 0, self.r, 1)
+        dm.set_speed(velocity=30)
 
     def place(self, dobot_manager, zoffset=12, wait=0.5):
         dm = dobot_manager
-        dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, 0, self.r, 1)
+        dm.set_speed(velocity=50)
+        dm.dType.SetPTPCmdEx(dm.api, 1, self.x,  self.y, 0, self.r, 1)
         dm.dType.SetPTPCmdEx(dm.api, 2, self.x,  self.y, self.z+zoffset, self.r, 1)
         dm.dType.SetWAITCmdEx(dm.api, wait, 1)
         dm.dType.SetEndEffectorSuctionCupEx(dm.api, 0, 1)
@@ -74,7 +80,7 @@ class DobotManager(object):
             data = f.read()
         jsondata = json.loads(data)
         self.camera, self.buffer, self.slot, self.pose = DobotPosition.deserialize(jsondata)
-        self.set_speed()
+        self.set_speed(velocity=50)
     
     def set_home(self):
         self.dType.SetHOMECmdEx(self.api, 0, 1)

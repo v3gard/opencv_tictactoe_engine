@@ -31,7 +31,7 @@ class GameEngine(object):
         self.currentplayer = self._decide_initial_player()
 
         if self._dm != None:
-            self._dm.camera.move_nooffset(self._dm, wait=1)
+            self._dm.camera.movej_nooffset(self._dm, wait=1)
     
     def _is_board_empty(self):
         unique = list(set(self._gameboard.status()))
@@ -150,9 +150,6 @@ class GameEngine(object):
 
     def minimax(self, newBoard, player):
         available_pos = self._get_all_free_pos(newBoard)
-
-
-
         if self._is_game_won_player("X", newBoard):
             score = 0
             return score
@@ -187,7 +184,6 @@ class GameEngine(object):
 
 
     def make_best_move(self, board, player,difficulty):
-
         if difficulty == "Easy":
             diff_random = 25
         elif difficulty == "Medium":
@@ -203,13 +199,14 @@ class GameEngine(object):
         best_choices = []
 
         available_pos = self._get_all_free_pos(board)
+        if len(available_pos)==9 and diff_random == 100:
+            return 4
         if rnum > diff_random:
             move = random.choice(available_pos)
             return move
 
         else:
             if player == "O":
-
                 for move in available_pos:
                     board = self.update_ai_board(move, player, board)
                     moveVal = self.minimax(board, self._change_player(player))
@@ -245,8 +242,9 @@ class GameEngine(object):
         #pos = self._get_free_position()
         if self._dm != None:
             self._dm.buffer[self.currentbuffer].pick(self._dm)
+            #self._dm.camera.movej_nooffset(self._dm, wait=0)
             self._dm.slot[pos].place(self._dm)
-            self._dm.camera.move_nooffset(self._dm, wait=0)
+            self._dm.camera.movej_nooffset(self._dm, wait=0)
             self.currentbuffer += 1
         self._update_board(pos, self.enemy)
         self.currentplayer = self.player
@@ -315,7 +313,7 @@ class GameEngine(object):
         else:
             print("GAME OVER! YOU LOST!")
             if self._dm != None:
-                self._dm.set_speed(velocity=100)
+                self._dm.set_speed(velocity=50)
                 for i in range(3):
                     self._dm.pose.movej_nooffset(self._dm, wait=0)
                     self._dm.camera.movej_nooffset(self._dm, wait=0)

@@ -99,7 +99,7 @@ def test(dobot_manager, camera, buffer, slot):
     dm = dobot_manager
     dm.set_speed()
     print("Going to camera position...")
-    camera.move_nooffset(dm)
+    camera.movej_nooffset(dm)
     print("Testing all board positions...")
     for i in sorted(slot.keys()):
         print("Going to position {0}...".format(i+1))
@@ -111,7 +111,7 @@ def test(dobot_manager, camera, buffer, slot):
         print("Going to buffer position {0}...".format(i+1))
         buffer[i].move(dm)
     print("Done. Returning to camera position...")
-    camera.move_nooffset(dm)
+    camera.movej_nooffset(dm)
     print("Test complete.")
 
 def pick_and_place(dobot_manager, camera, buffer, slot):

@@ -34,9 +34,9 @@ def main():
             ge.start(use_camera=False, gameboard_file="games/default.jpg")
     except KeyboardInterrupt as e:
         print("\nBye! Thanks for playing!")
-    except Exception as e:
-        print("Error: " + str(e))
-        exit(1)
+    #except Exception as e:
+    #    print("Error: " + str(e))
+    #    exit(1)
     exit(0)
 
 if __name__=="__main__":
