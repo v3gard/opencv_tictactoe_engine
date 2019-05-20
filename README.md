@@ -1,7 +1,7 @@
 OpenCV Tic Tac Toe Engine
 =========================
 
-[![Image from project, with video link](https://www.dropbox.com/s/opyk9djccnhwzt7/VID_20190408_155757.png?dl=0)](https://www.dropbox.com/s/qwh9dm1otlfxhlq/VID_20190408_155757.mp4?dl=0)
+[![Image from project, with video link](https://vegard.haugland.at/projects/opencv_tictactoe_engine/VID_20190408_155757.mp4.png)](https://www.dropbox.com/s/qwh9dm1otlfxhlq/VID_20190408_155757.mp4?dl=0)
 
 
 
